@@ -6,6 +6,7 @@ if __name__ == '__main__':
 	HOME = os.environ['HOME']
 
 	path_formats = os.path.join(HOME, 'repos/lwerdna/kaitai_struct_formats')
+	path_output = os.path.join(HOME, 'repos/lwerdna/kaitai_struct_formats/build')
 	path_compiler = os.path.join(HOME, 'Downloads/kaitai_struct_compiler/jvm/target/universal/stage/bin/kaitai-struct-compiler')
 
 	import_statements = []
@@ -22,13 +23,11 @@ if __name__ == '__main__':
 		for fname in fnames:
 			if not fname.endswith('.ksy'):
 				continue
-			if fname in exceptions:
-				continue
 
 			path_ksy = os.path.join(folder, fname)
 			
 			cmd = '%s --debug --target python --import-path %s --outdir %s %s' % \
-				(path_compiler, path_formats, folder, path_ksy)
+				(path_compiler, path_formats, path_output, path_ksy)
 			print(cmd)
 			os.system(cmd)
 

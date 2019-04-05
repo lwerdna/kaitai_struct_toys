@@ -101,7 +101,13 @@ if __name__ == '__main__':
 	cmd = sys.argv[1]
 	fpath = sys.argv[2]
 
-	if cmd == 'dump':
-		parsed = kshelp.parseFpath(fpath)
-		dump(parsed)
+	if cmd == 'dump0':
+		kshelp.setFieldExceptionLevel0()
+	elif cmd == 'dump1':
+		kshelp.setFieldExceptionLevel1()
+	elif cmd == 'dump2':
+		kshelp.setFieldExceptionLevel2()
+
+	parsed = kshelp.parseFpath(fpath)
+	dump(parsed)
 

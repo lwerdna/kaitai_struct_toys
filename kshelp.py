@@ -9,6 +9,7 @@ import types
 import binascii
 import importlib
 import traceback
+import collections
 
 import kaitaistruct
 
@@ -56,12 +57,15 @@ def objToStr(obj):
 		result = '%s' % (obj)
 	elif isinstance(obj, list):
 		result = repr(obj)
+	elif isinstance(obj, collections.defaultdict):
+		# probably _debug
+		result = repr(obj)
 	else:
-		result = '(unknown type %)' % (str(objType))
+		result = '(unknown type %s)' % (str(objType))
 
 	return result
 
-# access fields that may be properties, which could compute internal results
+# access all fields that may be properties, which could compute internal results
 # (often '_m_XXX' fields)
 def exercise(ksobj):
 	for candidate in dir(ksobj):
@@ -71,6 +75,50 @@ def exercise(ksobj):
 			foo = getattr(ksobj, candidate, False)
 		except Exception:
 			pass
+
+# get the [start,end) data for a given field within a ks object
+#
+# abstracts away:
+# * the debug['arr'] stuff, you just give it 'foo' or 'foo[3]'
+# * the 'foo' vs. '_m_foo' complication, you just give it 'foo'
+#
+def getFieldRange(ksobj, fieldName:str, restrictedToRoot=False):
+	if restrictedToRoot:
+		if ksobj._io != ksobj._root._io:
+			return None
+
+	# does given kaitai object even have ._debug?
+	debug = None
+	try:
+		debug = getattr(ksobj, '_debug')
+	except Exception:
+		return None
+
+	# divide up if request field is list, like "foo[3]"
+	tmp = None
+	if fieldName.endswith(']'):
+		m = re.match(r'^(.*)\[(\d+)\]$', fieldName)
+		fieldName = m.group(1)
+		index = int(m.group(2))
+
+		tmp = None
+		if not fieldName.startswith('_m_'):
+			if '_m_'+fieldName in debug:
+				tmp = debug['_m_'+fieldName]['arr'][index]
+		if not tmp:
+			tmp = debug[fieldName]['arr'][index]
+	else:
+		tmp = None
+		if not fieldName.startswith('_m_'):
+			if '_m_'+fieldName in debug:
+				tmp = debug['_m_'+fieldName]
+		if not tmp:
+			tmp = debug[fieldName]
+
+	if not tmp:
+		return None
+
+	return (tmp['start'], tmp['end'])
 
 #------------------------------------------------------------------------------
 # determine what kaitai module to use
@@ -92,7 +140,7 @@ def idData(dataSample, length):
 	if dataSample[0:4] in [b'\xfe\xed\xfa\xce', b'\xce\xfa\xed\xfe', b'\xfe\xed\xfa\xcf', b'\xcf\xfa\xed\xfe']:
 		result = 'mach_o'
 	if dataSample[0:2] == b'MZ':
-		result = 'kaitai_struct_formats.executable.microsoft_pe'
+		result = 'microsoft_pe'
 	if dataSample[0:8] == b'\x89PNG\x0d\x0a\x1a\x0a':
 		result = 'png'
 	if dataSample[2:11] == b'\xFF\xe0\x00\x10JFIF\x00':
@@ -108,7 +156,7 @@ def idData(dataSample, length):
 	if dataSample[0:2] == b'\x1f\x8b' and dataSample[2:3]==b'\x08':
 		result = 'gzip'
 
-	#print('idData() returning \'%s\'' % result)
+	print('idData() returning \'%s\'' % result)
 	return result
 
 def idFile(fpath):
@@ -360,4 +408,13 @@ def getLinkedKaitaiObjectsAll(ksobj, depth=0):
 	linkedObjects = getLinkedKaitaiObjects(ksobj)
 	for subobj in linkedObjects:
 		result += getLinkedKaitaiObjectsAll(subobj, depth+1)
+	return result
+
+def getDepth(ksobj, depth=0):
+	result = depth
+
+	exercise(ksobj)
+	for subObj in getLinkedKaitaiObjects(ksobj):
+		result = max(result, getDepth(subObj, depth+1))
+
 	return result
