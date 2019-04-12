@@ -11,24 +11,25 @@ import types
 import kaitaistruct
 import kshelp
 
-NORMAL = '\033[0m'
-BLACK = '\033[0;30m'
-RED = '\033[0;31m'
-GREEN = '\033[0;32m'
-YELLOW = '\033[0;33m'
-BLUE = '\033[0;34m'
-PURPLE = '\033[0;35m'
-CYAN = '\033[0;36m'
-GRAY = '\033[0;37m'
+NORMAL = '\x1b[0m'
 
-LBLACK = '\033[1;30m'
-LRED = '\033[1;31m'
-LGREEN = '\033[1;32m'
-LYELLOW = '\033[1;33m'
-LBLUE = '\033[1;34m'
-LPURPLE = '\033[1;35m'
-LCYAN = '\033[1;36m'
-LGRAY = '\033[1;37m'
+BLACK = '\x1b[30m'
+RED = '\x1b[31m'
+GREEN = '\x1b[32m'
+YELLOW = '\x1b[33m'
+BLUE = '\x1b[34m'
+PURPLE = '\x1b[35m'
+CYAN = '\x1b[36m'
+GRAY = '\x1b[37m'
+
+LBLACK = '\x1b[1;30m'
+LRED = '\x1b[1;31m'
+LGREEN = '\x1b[1;32m'
+LYELLOW = '\x1b[1;33m'
+LBLUE = '\x1b[1;34m'
+LPURPLE = '\x1b[1;35m'
+LCYAN = '\x1b[1;36m'
+LGRAY = '\x1b[1;37m'
 
 #------------------------------------------------------------------------------
 # text dumping stuff
@@ -37,7 +38,7 @@ LGRAY = '\033[1;37m'
 def dump(obj, depth=0):
 	indent = '    '*depth
 		
-	print((PURPLE+'%s%s'+NORMAL) % (indent, repr(obj)))
+	print(('%s'+PURPLE+'%s'+NORMAL) % (indent, repr(obj)))
 
 	kshelp.exercise(obj)
 	for fieldName in kshelp.getFieldNamesPrint(obj):
@@ -73,7 +74,10 @@ def dump(obj, depth=0):
 			color = GREEN
 			pass
 
-		print('%s.%s: %s%s%s' % (indent, fieldName, color, subObjStr, NORMAL))
+		if color:
+			print('%s.%s: %s%s%s' % (indent, fieldName, color, subObjStr, NORMAL))
+		else:
+			print('%s.%s: %s' % (indent, fieldName, subObjStr))
 
 	for fieldName in kshelp.getFieldNamesDescend(obj):
 		subObj = getattr(obj, fieldName)
@@ -95,8 +99,6 @@ def dump(obj, depth=0):
 
 if __name__ == '__main__':
 	assert len(sys.argv) == 3
-
-	kshelp.setFieldExceptionLevel2()
 
 	cmd = sys.argv[1]
 	fpath = sys.argv[2]

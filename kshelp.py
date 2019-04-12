@@ -49,14 +49,19 @@ def objToStr(obj):
 				('%02X' % obj[-1]) + ' (0x%X==%d bytes total)' % (len(obj), len(obj))
 		else:
 			result = binascii.hexlify(obj).decode('utf-8')
-	elif isinstance(obj, int):
-		result = '0x%X (%d)' % (obj, obj)
+	# note: bool needs to appear before int (else int determination will dominate)
 	elif isinstance(obj, bool):
 		result = '%s' % (obj)
+	elif isinstance(obj, int):
+		result = '0x%X (%d)' % (obj, obj)
 	elif str(objType).startswith('<enum '):
 		result = '%s' % (obj)
 	elif isinstance(obj, list):
 		result = repr(obj)
+	elif isinstance(obj, kaitaistruct.KaitaiStruct):
+		return re.match(r'^.*\.(\w+) object at ', repr(obj)).group(1)
+	elif isinstance(obj, kaitaistruct.KaitaiStream):
+		return re.match(r'^.*\.(\w+) object at ', repr(obj)).group(1)
 	elif isinstance(obj, collections.defaultdict):
 		# probably _debug
 		result = repr(obj)
@@ -156,7 +161,7 @@ def idData(dataSample, length):
 	if dataSample[0:2] == b'\x1f\x8b' and dataSample[2:3]==b'\x08':
 		result = 'gzip'
 
-	print('idData() returning \'%s\'' % result)
+	#print('idData() returning \'%s\'' % result)
 	return result
 
 def idFile(fpath):
@@ -306,7 +311,7 @@ def setFieldExceptionLevel1():
 	setFieldExceptionLevel0()
 
 	fieldPrintExceptionsPatterns += [r'_raw__.*$']
-	fieldPrintExceptions += ['_io', '_is_le', '_root', '_parent', '_debug']
+	fieldPrintExceptions += ['_is_le', '_root', '_parent', '_debug']
 	fieldPrintExceptions += ['_read', '_read_be', '_read_le']
 	fieldPrintExceptions += ['from_bytes', 'from_file', 'from_io']
 	fieldPrintExceptions += ['SEQ_FIELDS']
@@ -317,6 +322,7 @@ def setFieldExceptionLevel2():
 
 	setFieldExceptionLevel1()
 
+	#fieldPrintExceptions += ['_io']
 	fieldPrintExceptionsPatterns += [r'^_m_.*$', r'^__.*$']
 	fieldDescendExceptionsPatterns += [r'^_m_.*$']
 
@@ -384,14 +390,15 @@ def getFieldNamesDescend(ksobj):
 # OUT:	[obj0, obj1, obj2, ...]
 #
 def getLinkedKaitaiObjects(ksobj):
-	result = []
+	result = set()
 
 	for fieldName in getFieldNamesDescend(ksobj):
 		subobj = getattr(ksobj, fieldName, False)
 		if isinstance(subobj, list):
-			result += subobj
+			for tmp in subobj:
+				result.add(tmp)
 		else:
-			result += [subobj]
+			result.add(subobj)
 
 	return result
 
@@ -403,11 +410,13 @@ def getLinkedKaitaiObjectsAll(ksobj, depth=0):
 
 	exercise(ksobj)
 
-	result = [ksobj]
+	result = set([ksobj])
 
 	linkedObjects = getLinkedKaitaiObjects(ksobj)
 	for subobj in linkedObjects:
-		result += getLinkedKaitaiObjectsAll(subobj, depth+1)
+		subResult = getLinkedKaitaiObjectsAll(subobj, depth+1)
+		result = result.union(subResult)
+
 	return result
 
 def getDepth(ksobj, depth=0):
