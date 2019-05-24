@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# test script
-
-from __future__ import print_function
-
 import sys
 assert sys.version_info[0] == 3
 import types

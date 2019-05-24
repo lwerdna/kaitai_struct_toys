@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-# test script
-
-from __future__ import print_function
-
 import re
 import sys
 assert sys.version_info[0] == 3
@@ -79,7 +75,12 @@ def ksObjToDot(ksobj):
 		for fieldName in kshelp.getFieldNamesDescend(srcObj):
 			# fieldName can be a KaitaiStruct or a [KaitaiStruct, ...]
 			# normalize to list...
-			dstObjs = getattr(srcObj, fieldName, False)
+			dstObjs = None
+			try:
+				dstObjs = getattr(srcObj, fieldName)
+			except AttributeError:
+				continue
+
 			if not isinstance(dstObjs, list):
 				dstObjs = [dstObjs]
 

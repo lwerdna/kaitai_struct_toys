@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-
 # parse the file, drop into a python PDB REPL
-
-from __future__ import print_function
 
 import sys
 assert sys.version_info[0] == 3

@@ -77,7 +77,7 @@ def exercise(ksobj):
 		#if candidate.startswith('_') and (not candidate.startswith('_m_')):
 		#	continue
 		try:
-			foo = getattr(ksobj, candidate, False)
+			foo = getattr(ksobj, candidate)
 		except Exception:
 			pass
 
@@ -102,7 +102,9 @@ def getFieldRange(ksobj, fieldName:str, restrictedToRoot=False):
 	# divide up if request field is list, like "foo[3]"
 	tmp = None
 	if fieldName.endswith(']'):
-		m = re.match(r'^(.*)\[(\d+)\]$', fieldName)
+		m = re.match(r'^(\w*)\[(\d+)\]$', fieldName)
+		if not m:
+			raise Exception('malformed field name: %s' % fieldName)
 		fieldName = m.group(1)
 		index = int(m.group(2))
 
@@ -123,7 +125,12 @@ def getFieldRange(ksobj, fieldName:str, restrictedToRoot=False):
 	if not tmp:
 		return None
 
-	return (tmp['start'], tmp['end'])
+	result = [None, None]
+	if 'start' in tmp:
+		result[0] = tmp['start']
+	if 'end' in tmp:
+		result[1] = tmp['end']
+	return result
 
 #------------------------------------------------------------------------------
 # determine what kaitai module to use
@@ -313,6 +320,7 @@ def setFieldExceptionLevel1():
 	fieldPrintExceptionsPatterns += [r'_raw__.*$']
 	fieldPrintExceptions += ['_is_le', '_root', '_parent', '_debug']
 	fieldPrintExceptions += ['_read', '_read_be', '_read_le']
+	fieldPrintExceptions += ['close']
 	fieldPrintExceptions += ['from_bytes', 'from_file', 'from_io']
 	fieldPrintExceptions += ['SEQ_FIELDS']
 
@@ -322,7 +330,7 @@ def setFieldExceptionLevel2():
 
 	setFieldExceptionLevel1()
 
-	#fieldPrintExceptions += ['_io']
+	fieldPrintExceptions += ['_io']
 	fieldPrintExceptionsPatterns += [r'^_m_.*$', r'^__.*$']
 	fieldDescendExceptionsPatterns += [r'^_m_.*$']
 
@@ -333,14 +341,14 @@ def setFieldExceptionLevel2():
 # return all field names qualified for printing
 #
 def getFieldNamesPrint(ksobj):
-	result = []
+	result = set()
 
 	for fieldName in dir(ksobj):
 		if isFieldExceptionPrint(fieldName):
 			continue
 
 		try:
-			subobj = getattr(ksobj, fieldName, False)
+			subobj = getattr(ksobj, fieldName)
 
 			# do not return kaitai objects (are for descending, not printing)
 			if isinstance(subobj, kaitaistruct.KaitaiStruct):
@@ -351,11 +359,11 @@ def getFieldNamesPrint(ksobj):
 
 			#print('%s is ok' % fieldName)
 			#print('%s is instance? %s' % (fieldName, isinstance(subobj, kaitaistruct.KaitaiStruct)))
-			result.append(fieldName)
+			result.add(fieldName)
 		except Exception:
 			pass
 
-	return result
+	return list(result)
 
 # return all field names required for descending
 #
@@ -365,24 +373,24 @@ def getFieldNamesPrint(ksobj):
 #		- lists of kaitai objects
 #
 def getFieldNamesDescend(ksobj):
-	result = []
+	result = set()
 
 	for fieldName in dir(ksobj):
 		if isFieldExceptionDescend(fieldName):
 			continue
 
 		try:
-			subobj = getattr(ksobj, fieldName, False)
+			subobj = getattr(ksobj, fieldName)
 
 			if isinstance(subobj, kaitaistruct.KaitaiStruct):
-				result += [fieldName]
+				result.add(fieldName)
 			elif isinstance(subobj, list):
 				if len(subobj)>0 and isinstance(subobj[0], kaitaistruct.KaitaiStruct):
-					result += [fieldName]
-		except Exception:
+					result.add(fieldName)
+		except Exception as e:
 			pass
 
-	return result
+	return list(result)
 
 # compute all kaitai objects linked to from the given object
 #
@@ -393,7 +401,7 @@ def getLinkedKaitaiObjects(ksobj):
 	result = set()
 
 	for fieldName in getFieldNamesDescend(ksobj):
-		subobj = getattr(ksobj, fieldName, False)
+		subobj = getattr(ksobj, fieldName)
 		if isinstance(subobj, list):
 			for tmp in subobj:
 				result.add(tmp)
