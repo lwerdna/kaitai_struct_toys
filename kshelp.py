@@ -275,12 +275,14 @@ def parseIo(ioObj, ksModuleName=None):
 
 fieldDescendExceptions = ['_parent', '_root']
 fieldDescendExceptionsPatterns = []
+fieldDescendExceptionsFunctions = []
 
 fieldPrintExceptions = []
 fieldPrintExceptionsPatterns = []
+fieldPrintExceptionsFunctions = []
 
-def isFieldExceptionDescend(fieldName):
-	global fieldDescendExceptions, fieldDescendExceptionsPatterns
+def isFieldExceptionDescend(ksobj, fieldName):
+	global fieldDescendExceptions, fieldDescendExceptionsPatterns, fieldDescendExceptionsFunctions
 
 	if fieldName in fieldDescendExceptions:
 		return True
@@ -289,16 +291,24 @@ def isFieldExceptionDescend(fieldName):
 		if re.match(fep, fieldName):
 			return True
 
+	for func in fieldDescendExceptionsFunctions:
+		if func(ksobj, fieldName):
+			return True
+
 	return False
 
-def isFieldExceptionPrint(fieldName):
-	global fieldExceptions, fieldExceptionsPatterns
+def isFieldExceptionPrint(ksobj, fieldName):
+	global fieldPrintExceptions, fieldPrintExceptionsPatterns, fieldPrintExceptionsFunctions
 
 	if fieldName in fieldPrintExceptions:
 		return True
 
 	for fep in fieldPrintExceptionsPatterns:
 		if re.match(fep, fieldName):
+			return True
+
+	for func in fieldPrintExceptionsFunctions:
+		if func(ksobj, fieldName):
 			return True
 
 	return False
@@ -312,8 +322,8 @@ def setFieldExceptionLevel0():
 	fieldPrintExceptionsPatterns = []
 
 def setFieldExceptionLevel1():
-	global fieldDescendExceptions, fieldDescendExceptionsPatterns
-	global fieldPrintExceptions, fieldPrintExceptionsPatterns
+	global fieldDescendExceptions, fieldDescendExceptionsPatterns, fieldDescendExceptionsFunctions
+	global fieldPrintExceptions, fieldPrintExceptionsPatterns, fieldPrintExceptionsPatterns
 
 	setFieldExceptionLevel0()
 
@@ -323,6 +333,8 @@ def setFieldExceptionLevel1():
 	fieldPrintExceptions += ['close']
 	fieldPrintExceptions += ['from_bytes', 'from_file', 'from_io']
 	fieldPrintExceptions += ['SEQ_FIELDS']
+
+	fieldPrintExceptionsFunctions.append( lambda ksobj,fname: hasattr(ksobj,fname) and isinstance(getattr(ksobj,fname),type) )
 
 def setFieldExceptionLevel2():
 	global fieldDescendExceptions, fieldDescendExceptionsPatterns
@@ -344,7 +356,7 @@ def getFieldNamesPrint(ksobj):
 	result = set()
 
 	for fieldName in dir(ksobj):
-		if isFieldExceptionPrint(fieldName):
+		if isFieldExceptionPrint(ksobj, fieldName):
 			continue
 
 		try:
@@ -376,7 +388,7 @@ def getFieldNamesDescend(ksobj):
 	result = set()
 
 	for fieldName in dir(ksobj):
-		if isFieldExceptionDescend(fieldName):
+		if isFieldExceptionDescend(ksobj, fieldName):
 			continue
 
 		try:
