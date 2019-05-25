@@ -8,14 +8,39 @@ import urwid
 
 import kaitaistruct
 
+ktb = None
+
+def callback_tree_modified(listBox, footer):
+	kaitaiNode = listBox.get_focus()[1]
+
+	fieldName = kaitaiNode.get_key()
+
+	range_ = None
+	tmp = kaitaiNode.get_parent()
+	if tmp:
+		range_ = kshelp.getFieldRange(tmp._ksobj, fieldName)
+	if not range_:
+		range_ = ''
+	footer.set_text(".%s %s" % (fieldName, str(range_)))
+
 class KaitaiTreeWidget(urwid.TreeWidget):
-	""" Display widget for leaf nodes """
+	global ktb
+
+	unexpanded_icon = urwid.AttrMap(urwid.TreeWidget.unexpanded_icon, 'dirmark')
+	expanded_icon = urwid.AttrMap(urwid.TreeWidget.expanded_icon, 'dirmark')
+
+	def __init__(self, node):
+		self.__super.__init__(node)
+		self._w = urwid.AttrWrap(self._w, None)
+		self._w.attr = 'body'
+		self._w.focus_attr = 'focus'
+
 	def get_display_text(self):
 		# default display will be "key: value"
 		return urwid.TreeWidget.get_display_text(self)
 
-		#ksobj = self.get_node().get_value()
-		#return kshelp.objToStr(ksobj)
+	def selectable(self):
+		return True
 
 class KaitaiNode(urwid.TreeNode):
 	# same as TreeNode constructor + ksobj
@@ -56,12 +81,30 @@ class KaitaiParentNode(urwid.ParentNode):
 
 	# URWID asks us the names ("keys") of our children
 	def load_child_keys(self):
+		result = []
+
 		kshelp.exercise(self._ksobj)
-		return kshelp.getFieldNamesPrint(self._ksobj) + kshelp.getFieldNamesDescend(self._ksobj)
+		for fieldName in (kshelp.getFieldNamesPrint(self._ksobj) + kshelp.getFieldNamesDescend(self._ksobj)):
+			childObj = getattr(self._ksobj, fieldName)
+			if isinstance(childObj, list):
+				for i in range(len(childObj)):
+					result.append('%s[%d]' % (fieldName, i))
+			else:
+				result.append(fieldName)
+
+		return result
 
 	# URWID asks us for nodes for each of the names ("keys") of our children
 	def load_child_node(self, key):
-		childObj = getattr(self._ksobj, key)
+		childObj = None
+
+		# is the key like "blah[5]"? then list
+		m = re.match(r'^(\w*)\[(\d+)\]$', key)
+		if m:
+			(fieldName, fieldIdx) = m.group(1,2)
+			childObj = getattr(self._ksobj, fieldName)[int(fieldIdx)]
+		else:
+			childObj = getattr(self._ksobj, key)
 
 		if isinstance(childObj, kaitaistruct.KaitaiStruct):
 			return KaitaiParentNode(None, childObj, parent=self, key=key)
@@ -70,17 +113,19 @@ class KaitaiParentNode(urwid.ParentNode):
 
 class KaitaiTreeBrowser:
 	palette = [
-		#('body', 'black', 'light gray'),
 		('body', 'light gray', 'black'),
+		('flagged', 'black', 'dark green', ('bold','underline')),
 		('focus', 'light gray', 'dark blue', 'standout'),
+		('flagged focus', 'yellow', 'dark cyan',
+		('bold','standout','underline')),
 		('head', 'yellow', 'black', 'standout'),
 		('foot', 'light gray', 'black'),
 		('key', 'light cyan', 'black','underline'),
 		('title', 'white', 'black', 'bold'),
+		('dirmark', 'black', 'dark cyan', 'bold'),
 		('flag', 'dark gray', 'light gray'),
 		('error', 'dark red', 'light gray'),
-		('selectedwidget', 'dark red', 'black')
-		]
+	]
 
 	footer_text = [
 		('title', "Kaitai Data Browser"), "	",
@@ -96,8 +141,9 @@ class KaitaiTreeBrowser:
 		]
 
 	def __init__(self, ksobj=None):
-		self.topnode = KaitaiParentNode(None, ksobj, key='root')
-		self.listbox = urwid.TreeListBox(urwid.TreeWalker(self.topnode))
+		self.topnode = KaitaiParentNode(None, ksobj, key=kshelp.objToStr(ksobj))
+		self.walker = urwid.TreeWalker(self.topnode)
+		self.listbox = urwid.TreeListBox(self.walker)
 		self.listbox.offset_rows = 0
 		self.header = urwid.Text( "" )
 		self.footer = urwid.AttrWrap( urwid.Text( self.footer_text ),
@@ -106,6 +152,8 @@ class KaitaiTreeBrowser:
 			urwid.AttrWrap( self.listbox, 'body' ),
 			header=urwid.AttrWrap(self.header, 'head' ),
 			footer=self.footer )
+
+		urwid.connect_signal(self.walker, "modified", callback_tree_modified, weak_args=[self.listbox, self.footer])
 
 	def main(self):
 		"""Run the program."""
@@ -137,5 +185,6 @@ if __name__ == '__main__':
 
 	ksobj = kshelp.parseFpath(fpath)
 
-	KaitaiTreeBrowser(ksobj).main()
+	ktb = KaitaiTreeBrowser(ksobj)
+	ktb.main()
 	#dumpDict(treeDict, 0)
