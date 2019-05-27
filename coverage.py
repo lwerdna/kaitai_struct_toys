@@ -10,6 +10,8 @@ import kshelp
 from PIL import Image, ImageDraw
 import colorsys
 
+filterLevel = 0
+
 width = 1024
 height = 768
 widthBar = 16
@@ -31,6 +33,8 @@ def drawRange(start, end, depth):
 	draw.line((x0,y0,x1,y0), fill=(0,0,0))
 
 def coverage(obj, depth=0, doDraw=False):
+	global filterLevel
+
 	kshelp.exercise(obj)
 
 	indent = '    '*depth
@@ -38,7 +42,7 @@ def coverage(obj, depth=0, doDraw=False):
 	queue = []
 
 	# printable (non descendable field names)
-	for fieldName in kshelp.getFieldNamesPrint(obj) + kshelp.getFieldNamesDescend(obj):
+	for fieldName in kshelp.getFieldNamesPrint(obj, filterLevel) + kshelp.getFieldNamesDescend(obj, filterLevel):
 		try:
 			subObj = getattr(obj, fieldName)
 		except Exception:
@@ -92,7 +96,7 @@ def drawFile(fpath):
 if __name__ == '__main__':
 	assert len(sys.argv) == 3
 
-	kshelp.setFieldExceptionLevel2()
+	filterLevel = 2
 
 	cmd = sys.argv[1]
 	fpath = sys.argv[2]

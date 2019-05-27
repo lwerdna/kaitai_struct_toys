@@ -7,6 +7,8 @@ from subprocess import Popen, PIPE
 
 import kshelp
 
+filterLevel = 0
+
 def run(cmd):
 	print(' '.join(cmd))
 	process = Popen(cmd, stdout=PIPE)
@@ -16,6 +18,8 @@ def run(cmd):
 	return stdout
 
 def ksObjToNode(ksobj, id_):
+	global filterLevel
+
 	kshelp.exercise(ksobj)
 
 	result = ''
@@ -27,7 +31,7 @@ def ksObjToNode(ksobj, id_):
 	fieldDescriptions = ['<title> [%s]' % title]
 
 	# add non-KaitaiStruct fields
-	for candidate in sorted(kshelp.getFieldNamesPrint(ksobj)):
+	for candidate in sorted(kshelp.getFieldNamesPrint(ksobj, filterLevel)):
 		tmp = repr(candidate)
 		tmp = tmp.replace('"', '\\"')
 		if tmp.startswith('\'') and tmp.endswith('\''):
@@ -35,7 +39,7 @@ def ksObjToNode(ksobj, id_):
 		fieldDescriptions.append('<%s> .%s' % (tmp, tmp))
 
 	# add KaitaiStruct fields
-	for candidate in sorted(kshelp.getFieldNamesDescend(ksobj)):
+	for candidate in sorted(kshelp.getFieldNamesDescend(ksobj, filterLevel)):
 		fieldDescriptions.append('<%s> .%s' % (candidate, candidate))
 
 	result += '\t\tlabel = "%s"\n' % ('|'.join(fieldDescriptions))
@@ -45,6 +49,8 @@ def ksObjToNode(ksobj, id_):
 	return result
 
 def ksObjToDot(ksobj):
+	global filterLevel
+
 	dot = ''
 	dot += 'digraph g {\n'
 	dot += '	graph [\n'
@@ -72,7 +78,7 @@ def ksObjToDot(ksobj):
 	# declare edges
 	id_ = 0
 	for srcObj in ksObjs:
-		for fieldName in kshelp.getFieldNamesDescend(srcObj):
+		for fieldName in kshelp.getFieldNamesDescend(srcObj, filterLevel):
 			# fieldName can be a KaitaiStruct or a [KaitaiStruct, ...]
 			# normalize to list...
 			dstObjs = None
@@ -109,14 +115,7 @@ if __name__ == '__main__':
 	assert len(sys.argv) == 3
 	(cmd, fpath) = (sys.argv[1], sys.argv[2])
 
-	kshelp.fieldPrintExceptionsPatterns += [r'^__.*__$']
-	# graph0 shows the rawest data returned by kaitai
-	if cmd == 'graph0':
-		kshelp.setFieldExceptionLevel0()
-	elif cmd == 'graph1':
-		kshelp.setFieldExceptionLevel1()
-	elif cmd == 'graph2':
-		kshelp.setFieldExceptionLevel2()
+	filterLevel = int(sys.argv[1])
 
 	parsed = kshelp.parseFpath(fpath)
 	with open('/tmp/tmp.dot', 'w') as fp:

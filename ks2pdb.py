@@ -15,17 +15,9 @@ import pdb
 #------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-	assert len(sys.argv) == 3
+	assert len(sys.argv) == 2
 
-	cmd = sys.argv[1]
-	fpath = sys.argv[2]
-
-	if cmd == 'dump0':
-		kshelp.setFieldExceptionLevel0()
-	elif cmd == 'dump1':
-		kshelp.setFieldExceptionLevel1()
-	elif cmd == 'dump2':
-		kshelp.setFieldExceptionLevel2()
+	fpath = sys.argv[1]
 
 	parsed = kshelp.parseFpath(fpath)
 	kshelp.exercise(parsed)

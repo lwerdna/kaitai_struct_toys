@@ -7,11 +7,15 @@ import types
 import kaitaistruct
 import kshelp
 
+filterLevel = 0
+
 #------------------------------------------------------------------------------
 # text dumping stuff
 #------------------------------------------------------------------------------
 
 def dump(obj, depth=0):
+	global filterLevel
+
 	print('%s{' % ('\t'*depth))
 	depth += 1
 	
@@ -19,8 +23,8 @@ def dump(obj, depth=0):
 
 	kshelp.exercise(obj)
 
-	fieldNamesPrint = kshelp.getFieldNamesPrint(obj)
-	fieldNamesDescend = kshelp.getFieldNamesDescend(obj)
+	fieldNamesPrint = kshelp.getFieldNamesPrint(obj, filterLevel)
+	fieldNamesDescend = kshelp.getFieldNamesDescend(obj, filterLevel)
 	fieldNamesAll = fieldNamesPrint + fieldNamesDescend
 	for (i,fieldName) in enumerate(fieldNamesAll):
 		subObj = None
@@ -67,16 +71,9 @@ def dump(obj, depth=0):
 if __name__ == '__main__':
 	assert len(sys.argv) == 3
 
-	cmd = sys.argv[1]
+	filterLevel = int(sys.argv[1])
 	fpath = sys.argv[2]
 
-	if cmd == 'dump0':
-		kshelp.setFieldExceptionLevel0()
-	elif cmd == 'dump1':
-		kshelp.setFieldExceptionLevel1()
-	elif cmd == 'dump2':
-		kshelp.setFieldExceptionLevel2()
-
 	parsed = kshelp.parseFpath(fpath)
-	dump(parsed)
+	dump(parsed, filterLevel)
 

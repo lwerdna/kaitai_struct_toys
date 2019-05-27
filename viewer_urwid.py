@@ -8,6 +8,7 @@ import urwid
 
 import kaitaistruct
 
+filterLevel = 0
 ktb = None
 
 def callback_tree_modified(listBox, footer):
@@ -81,10 +82,15 @@ class KaitaiParentNode(urwid.ParentNode):
 
 	# URWID asks us the names ("keys") of our children
 	def load_child_keys(self):
+		global filterLevel
+
 		result = []
 
 		kshelp.exercise(self._ksobj)
-		for fieldName in (kshelp.getFieldNamesPrint(self._ksobj) + kshelp.getFieldNamesDescend(self._ksobj)):
+		for fieldName in (
+			kshelp.getFieldNamesPrint(self._ksobj, filterLevel) +
+			kshelp.getFieldNamesDescend(self._ksobj, filterLevel)
+		):
 			childObj = getattr(self._ksobj, fieldName)
 			if isinstance(childObj, list):
 				for i in range(len(childObj)):
@@ -172,19 +178,10 @@ class KaitaiTreeBrowser:
 
 if __name__ == '__main__':
 	assert len(sys.argv) == 3
-	(cmd, fpath) = (sys.argv[1], sys.argv[2])
+	(filterLevel, fpath) = (sys.argv[1], sys.argv[2])
 
-	#kshelp.fieldPrintExceptionsPatterns += [r'^__.*__$']
-	# level0 shows the rawest data returned by kaitai
-	if cmd == 'level0':
-		kshelp.setFieldExceptionLevel0()
-	elif cmd == 'level1':
-		kshelp.setFieldExceptionLevel1()
-	elif cmd == 'level2':
-		kshelp.setFieldExceptionLevel2()
-
+	filterLevel = int(filterLevel)
 	ksobj = kshelp.parseFpath(fpath)
-
 	ktb = KaitaiTreeBrowser(ksobj)
 	ktb.main()
 	#dumpDict(treeDict, 0)

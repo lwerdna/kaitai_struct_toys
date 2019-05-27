@@ -87,6 +87,9 @@ def exercise(ksobj):
 # * the debug['arr'] stuff, you just give it 'foo' or 'foo[3]'
 # * the 'foo' vs. '_m_foo' complication, you just give it 'foo'
 #
+# restrictedToRoot: means the start/end are only returned if they're in the
+# original file (vs. being in a kaitai substream)
+
 def getFieldRange(ksobj, fieldName:str, restrictedToRoot=False):
 	if restrictedToRoot:
 		if ksobj._io != ksobj._root._io:
@@ -99,8 +102,9 @@ def getFieldRange(ksobj, fieldName:str, restrictedToRoot=False):
 	except Exception:
 		return None
 
-	# divide up if request field is list, like "foo[3]"
 	tmp = None
+
+	# is the request for a list member? eg. "load_commands[13]" ?
 	if fieldName.endswith(']'):
 		m = re.match(r'^(\w*)\[(\d+)\]$', fieldName)
 		if not m:
@@ -108,19 +112,25 @@ def getFieldRange(ksobj, fieldName:str, restrictedToRoot=False):
 		fieldName = m.group(1)
 		index = int(m.group(2))
 
-		tmp = None
+		# prefer the '_m_' version
 		if not fieldName.startswith('_m_'):
-			if '_m_'+fieldName in debug:
+			mfield = '_m_'+fieldName
+			if mfield in debug and 'arr' in debug[mfield]:
 				tmp = debug['_m_'+fieldName]['arr'][index]
+
+		# fall back to normal version
 		if not tmp:
-			tmp = debug[fieldName]['arr'][index]
+			if fieldName in debug and 'arr' in debug[fieldName]:
+				tmp = debug[fieldName]['arr'][index]
 	else:
-		tmp = None
+		# prefer the '_m_' version
 		if not fieldName.startswith('_m_'):
-			if '_m_'+fieldName in debug:
-				tmp = debug['_m_'+fieldName]
+			mfield = '_m_'+fieldName
+			if mfield in debug:
+				tmp = debug[mfield]
 		if not tmp:
-			tmp = debug[fieldName]
+			if fieldName in debug:
+				tmp = debug[fieldName]
 
 	if not tmp:
 		return None
@@ -273,78 +283,61 @@ def parseIo(ioObj, ksModuleName=None):
 # - should not DESCEND into (eg: ._parent, ._root)
 # - should not PRINT (eg: ._io)
 
-fieldDescendExceptions = ['_parent', '_root']
-fieldDescendExceptionsPatterns = []
-fieldDescendExceptionsFunctions = []
+def filterDescend(ksobj, fieldName, level):
+	result = False
 
-fieldPrintExceptions = []
-fieldPrintExceptionsPatterns = []
-fieldPrintExceptionsFunctions = []
+	if level >= 0:
+		blacklist = ['_root', '_parent']
+		if fieldName in blacklist:
+			result = True
 
-def isFieldExceptionDescend(ksobj, fieldName):
-	global fieldDescendExceptions, fieldDescendExceptionsPatterns, fieldDescendExceptionsFunctions
+	if not result and level >= 1:
+		pass
 
-	if fieldName in fieldDescendExceptions:
-		return True
+	if not result and level >= 2:
+		if fieldName.startswith('_m_'):
+			result = True
 
-	for fep in fieldDescendExceptionsPatterns:
-		if re.match(fep, fieldName):
-			return True
+	#if result:
+	#	print('field %s has been filtered (descent)' % fieldName)
+	return result
 
-	for func in fieldDescendExceptionsFunctions:
-		if func(ksobj, fieldName):
-			return True
+def filterPrint(ksobj, fieldName, level):
+	result = False
 
-	return False
+	# at level 0, print everything
+	if level >= 0:
+		pass
 
-def isFieldExceptionPrint(ksobj, fieldName):
-	global fieldPrintExceptions, fieldPrintExceptionsPatterns, fieldPrintExceptionsFunctions
+	# level 1
+	if not result and level >= 1:
+		blacklist = [ '_root', '_parent',
+			'_debug', 'SEQ_FIELDS',
+			'_is_le', '_read',
+			'_read_be', '_read_le', 'close',
+			'from_bytes', 'from_file', 'from_io'
+		]
+		if fieldName in blacklist:
+			result = True
+		elif re.match(r'^_raw__.*$', fieldName):
+			result = True
+		elif hasattr(ksobj, fieldName):
+			if isinstance(getattr(ksobj, fieldName), type):
+				result = True
 
-	if fieldName in fieldPrintExceptions:
-		return True
+	# level 2
+	if not result and level >= 2:
+		blacklist = ['_io']
+		if fieldName in blacklist:
+			result = True
+		elif fieldName.startswith('_m_'):
+			result = True
+		elif fieldName.startswith('__'):
+			result = True
 
-	for fep in fieldPrintExceptionsPatterns:
-		if re.match(fep, fieldName):
-			return True
-
-	for func in fieldPrintExceptionsFunctions:
-		if func(ksobj, fieldName):
-			return True
-
-	return False
-
-def setFieldExceptionLevel0():
-	global fieldDescendExceptions, fieldDescendExceptionsPatterns
-	global fieldPrintExceptions, fieldPrintExceptionsPatterns
-	fieldDescendExceptions = ['_parent', '_root']
-	fieldDescendExceptionsPatterns = []
-	fieldPrintExceptions = []
-	fieldPrintExceptionsPatterns = []
-
-def setFieldExceptionLevel1():
-	global fieldDescendExceptions, fieldDescendExceptionsPatterns, fieldDescendExceptionsFunctions
-	global fieldPrintExceptions, fieldPrintExceptionsPatterns, fieldPrintExceptionsPatterns
-
-	setFieldExceptionLevel0()
-
-	fieldPrintExceptionsPatterns += [r'_raw__.*$']
-	fieldPrintExceptions += ['_is_le', '_root', '_parent', '_debug']
-	fieldPrintExceptions += ['_read', '_read_be', '_read_le']
-	fieldPrintExceptions += ['close']
-	fieldPrintExceptions += ['from_bytes', 'from_file', 'from_io']
-	fieldPrintExceptions += ['SEQ_FIELDS']
-
-	fieldPrintExceptionsFunctions.append( lambda ksobj,fname: hasattr(ksobj,fname) and isinstance(getattr(ksobj,fname),type) )
-
-def setFieldExceptionLevel2():
-	global fieldDescendExceptions, fieldDescendExceptionsPatterns
-	global fieldPrintExceptions, fieldPrintExceptionsPatterns
-
-	setFieldExceptionLevel1()
-
-	fieldPrintExceptions += ['_io']
-	fieldPrintExceptionsPatterns += [r'^_m_.*$', r'^__.*$']
-	fieldDescendExceptionsPatterns += [r'^_m_.*$']
+	#if result:
+	#	print('field %s has been filtered (print)' % fieldName)
+	return result
 
 #------------------------------------------------------------------------------
 # kaitai object exploring stuff
@@ -352,11 +345,11 @@ def setFieldExceptionLevel2():
 
 # return all field names qualified for printing
 #
-def getFieldNamesPrint(ksobj):
+def getFieldNamesPrint(ksobj, filterLevel=0):
 	result = set()
 
 	for fieldName in dir(ksobj):
-		if isFieldExceptionPrint(ksobj, fieldName):
+		if filterPrint(ksobj, fieldName, filterLevel):
 			continue
 
 		try:
@@ -384,11 +377,11 @@ def getFieldNamesPrint(ksobj):
 #		- kaitai objects
 #		- lists of kaitai objects
 #
-def getFieldNamesDescend(ksobj):
+def getFieldNamesDescend(ksobj, filterLevel=0):
 	result = set()
 
 	for fieldName in dir(ksobj):
-		if isFieldExceptionDescend(ksobj, fieldName):
+		if filterDescend(ksobj, fieldName, filterLevel):
 			continue
 
 		try:

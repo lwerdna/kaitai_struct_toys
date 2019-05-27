@@ -30,14 +30,17 @@ LGRAY = '\x1b[1;37m'
 #------------------------------------------------------------------------------
 # text dumping stuff
 #------------------------------------------------------------------------------
+filterLevel = 0
 
 def dump(obj, depth=0):
+	global filterLevel
+
 	indent = '    '*depth
 		
 	print(('%s'+PURPLE+'%s'+NORMAL) % (indent, repr(obj)))
 
 	kshelp.exercise(obj)
-	for fieldName in kshelp.getFieldNamesPrint(obj):
+	for fieldName in kshelp.getFieldNamesPrint(obj, filterLevel):
 		subObj = None
 		try:
 			subObj = getattr(obj, fieldName)
@@ -75,7 +78,7 @@ def dump(obj, depth=0):
 		else:
 			print('%s.%s: %s' % (indent, fieldName, subObjStr))
 
-	for fieldName in kshelp.getFieldNamesDescend(obj):
+	for fieldName in kshelp.getFieldNamesDescend(obj, filterLevel):
 		subObj = getattr(obj, fieldName)
 		
 		#print('recurring on: %s' % repr(subObj))
@@ -96,16 +99,9 @@ def dump(obj, depth=0):
 if __name__ == '__main__':
 	assert len(sys.argv) == 3
 
-	cmd = sys.argv[1]
+	filterLevel = int(sys.argv[1])
 	fpath = sys.argv[2]
 
-	if cmd == 'dump0':
-		kshelp.setFieldExceptionLevel0()
-	elif cmd == 'dump1':
-		kshelp.setFieldExceptionLevel1()
-	elif cmd == 'dump2':
-		kshelp.setFieldExceptionLevel2()
-
 	parsed = kshelp.parseFpath(fpath)
-	dump(parsed)
+	dump(parsed, filterLevel)
 
